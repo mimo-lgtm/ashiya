@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -233,13 +234,14 @@ textarea:focus{outline:none;}
   <p style="margin-bottom:18px;color:#5a5f52;">まちについて思っていることを自由に書いてください。AIが「核心・変化・成功事例・懸念点・問い」の5つの視点で読み解き、要約・タイトル・テーマを整理します。</p>
  
   <div class="settings-panel">
-    <div class="settings-head" onclick="this.nextElementSibling.classList.toggle('open')">🔗 スプレッドシート連携設定（任意・クリックで開閉）</div>
+    <div class="settings-head" onclick="this.nextElementSibling.classList.toggle('open')">🔗 連携設定（クリックで開閉）</div>
     <div class="settings-body">
       <div class="settings-row">
-        <input type="text" id="gasUrlInput" placeholder="Google Apps Script Web App の /exec URL を貼り付け">
+        <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/AKfycbwIso-Q30s0TcLQHeOM9hLs0m2kpufrCbXamqMseZCS-eLLTZxo0zT0ASv5qr82pd4xRA/exec">
         <button onclick="saveGasUrl()">保存</button>
       </div>
-      <div class="settings-status" id="gasUrlStatus">未設定：投稿はこのページ内にのみ保存されます。</div>
+      <div class="settings-status" id="gasUrlStatus">未設定：AI分析・スプレッドシート記録のどちらも動作しません。</div>
+      <div class="settings-status" style="margin-top:4px;">※Groq APIキーはブラウザ側には保存せず、Apps Scriptの「スクリプト プロパティ」（GROQ_API_KEY）に安全に格納されます。</div>
     </div>
   </div>
  
@@ -390,7 +392,18 @@ function getSubs(bigKey){
   return [...base.filter(s=>s.key!=='MID-5'), ...dyn, base.find(s=>s.key==='MID-5')];
 }
  
-/* ===================== GOOGLE SHEETS (GAS) LOGGING ===================== */
+/* ===================== AI CALL (proxied through Apps Script → Groq/Llama) ===================== */
+async function callGroq(systemPrompt, userText, wantJson){
+  if(!gasUrl){ throw new Error('連携設定でGoogle Apps ScriptのURLを保存してください（AI分析はこのURL経由で実行されます）。'); }
+  const response = await fetch(gasUrl, {
+    method:'POST',
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight against Apps Script
+    body: JSON.stringify({ action:'groqProxy', systemPrompt, userText, wantJson: !!wantJson })
+  });
+  const data = await response.json();
+  if(!data.ok){ throw new Error(data.error || 'AI呼び出しに失敗しました。'); }
+  return data.content;
+}
 let gasUrl = "";
 async function loadGasUrl(){
   try{
@@ -400,13 +413,13 @@ async function loadGasUrl(){
   const input = document.getElementById('gasUrlInput');
   const status = document.getElementById('gasUrlStatus');
   if(input) input.value = gasUrl;
-  if(status) status.textContent = gasUrl ? "設定済み：投稿はスプレッドシートにも記録されます。" : "未設定：投稿はこのページ内にのみ保存されます。";
+  if(status) status.textContent = gasUrl ? "設定済み：AI分析・スプレッドシート記録の両方がこのURL経由で動作します。" : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
 }
 async function saveGasUrl(){
   const input = document.getElementById('gasUrlInput');
   gasUrl = input.value.trim();
   try{ await window.storage.set('ashiya_gas_url', gasUrl, false); }catch(e){}
-  document.getElementById('gasUrlStatus').textContent = gasUrl ? "設定済み：投稿はスプレッドシートにも記録されます。" : "未設定：投稿はこのページ内にのみ保存されます。";
+  document.getElementById('gasUrlStatus').textContent = gasUrl ? "設定済み：AI分析・スプレッドシート記録の両方がこのURL経由で動作します。" : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
 }
 function genAuthorId(name){
   const base = (name||'anon').replace(/\s+/g,'').slice(0,12);
@@ -460,13 +473,7 @@ async function classifyAI(text){
  
 大分類と中分類の一覧: ${catList}`;
  
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1600, system:systemPrompt,
-      messages:[{ role:"user", content:text }] })
-  });
-  const data = await response.json();
-  const raw = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+  const raw = await callGroq(systemPrompt, text, true);
   return JSON.parse(raw.replace(/```json|```/g,'').trim());
 }
  
@@ -482,13 +489,7 @@ async function mergeDecisionAI(activeArticles, proposal){
 既存のアクティブな記事:
 ${list}`;
  
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:1600, system:systemPrompt,
-      messages:[{ role:"user", content:`新しい提案\nタイトル: ${proposal.title}\n要約: ${proposal.summary200}\n本文: ${proposal.raw}` }] })
-  });
-  const data = await response.json();
-  const raw = (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+  const raw = await callGroq(systemPrompt, `新しい提案\nタイトル: ${proposal.title}\n要約: ${proposal.summary200}\n本文: ${proposal.raw}`, true);
   return JSON.parse(raw.replace(/```json|```/g,'').trim());
 }
  
@@ -499,13 +500,8 @@ async function blendAI(bigKey){
   const citizenText = active.map(a=>`・${a.title}：${a.summary}`).join('\n') || '（まだ市民の声は積み重なっていません）';
   const systemPrompt = `あなたは大分類ごとの「提案集約・共創アップデート案」を作成するアシスタントです。次の①最初のビジョン（ベース案）と②市民の声が積み重なって出来た統合記事の内容を、分量ではなく内容の重み付けで半々（50%ずつ）反映した300〜350文字程度の統合文章を、前置きなしで本文のみ出力してください（JSON不要）。`;
   const userMsg = `①最初のビジョン（ベース案）:\n${base}\n\n②市民の声の統合記事:\n${citizenText}`;
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify({ model:"claude-sonnet-4-6", max_tokens:900, system:systemPrompt,
-      messages:[{ role:"user", content:userMsg }] })
-  });
-  const data = await response.json();
-  return (data.content||[]).filter(b=>b.type==='text').map(b=>b.text).join('').trim();
+  const text = await callGroq(systemPrompt, userMsg, false);
+  return text.trim();
 }
  
 /* ===================== ASSIST PAGE FLOW ===================== */
@@ -524,7 +520,7 @@ async function runAI(){
     renderSlip(pendingResult);
   }catch(err){
     console.error(err);
-    slip.innerHTML = '<p class="slip-empty">読み取りに失敗しました。もう一度お試しください。</p>';
+    slip.innerHTML = `<p class="slip-empty">読み取りに失敗しました：${escapeHtml(err.message||String(err))}</p>`;
   }finally{
     runBtn.disabled=false; loading.style.display='none';
   }
@@ -704,7 +700,7 @@ async function toggleUpdate(bigKey){
     btn.textContent = '閉じる'; btn.classList.add('close');
   }catch(e){
     console.error(e);
-    body.innerHTML = '生成に失敗しました。もう一度お試しください。';
+    body.innerHTML = escapeHtml('生成に失敗しました：' + (e.message||String(e)));
   }finally{
     btn.disabled = false;
   }
@@ -830,3 +826,4 @@ function escapeHtml(str){
 </script>
 </body>
 </html>
+ 
