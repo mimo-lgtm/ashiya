@@ -1,4 +1,5 @@
 
+Ashiya voice board v6 · HTML
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -241,6 +242,7 @@ textarea:focus{outline:none;}
         <button onclick="saveGasUrl()">保存</button>
       </div>
       <div class="settings-status" id="gasUrlStatus">未設定：AI分析・スプレッドシート記録のどちらも動作しません。</div>
+      <div class="settings-status" style="margin-top:4px;">※ここでの保存はこのブラウザだけの一時確認用です。全員が使えるようにするには、コード内の<code>GAS_URL_DEFAULT</code>に直接URLを貼り付けて公開してください。</div>
       <div class="settings-status" style="margin-top:4px;">※Groq APIキーはブラウザ側には保存せず、Apps Scriptの「スクリプト プロパティ」（GROQ_API_KEY）に安全に格納されます。</div>
     </div>
   </div>
@@ -281,28 +283,26 @@ textarea:focus{outline:none;}
 </main>
  
 <script>
+/* ===================== 連携設定 ===================== */
+// 公開後は、ここに発行したGoogle Apps Script Web AppのURL(.../exec)を直接貼り付けてください。
+// こうしておけば、サイトを訪れた人は誰も設定不要ですぐに使えます（下の設定欄への入力は、
+// このブラウザだけの一時的な動作確認用の上書きです）。
+const GAS_URL_DEFAULT = "";
+let gasUrl = GAS_URL_DEFAULT;
+ 
 /* ===================== BASE CATEGORY DEFINITIONS ===================== */
+const OTHER_LABEL = "その他";
 const CATEGORIES = [
-  { key:"BIG-1", icon:"🏙️", label:"まちづくり・都市計画", sublabel:"住みやすさの基盤", baseSubs:[
-      {key:"MID-1", label:"住宅・まちなみ"}, {key:"MID-2", label:"交通・移動手段"},
-      {key:"MID-3", label:"公園・緑地・景観"}, {key:"MID-4", label:"防災・レジリエンス"},
-      {key:"MID-5", label:"その他"} ]},
-  { key:"BIG-2", icon:"👶", label:"子育て・教育環境", sublabel:"次世代を育てるまち", baseSubs:[
-      {key:"MID-1", label:"保育・教育施設"}, {key:"MID-2", label:"子ども・若者の居場所"},
-      {key:"MID-3", label:"学びの機会（生涯学習）"}, {key:"MID-4", label:"家族支援"},
-      {key:"MID-5", label:"その他"} ]},
-  { key:"BIG-3", icon:"🤝", label:"福祉・健康・共生", sublabel:"誰も取り残さないまち", baseSubs:[
-      {key:"MID-1", label:"高齢者支援"}, {key:"MID-2", label:"障害者・多様な人々の支援"},
-      {key:"MID-3", label:"健康づくり"}, {key:"MID-4", label:"地域コミュニティ"},
-      {key:"MID-5", label:"その他"} ]},
-  { key:"BIG-4", icon:"🌳", label:"環境・持続可能性", sublabel:"未来に繋ぐ芦屋", baseSubs:[
-      {key:"MID-1", label:"気候変動対策"}, {key:"MID-2", label:"資源循環・ごみ問題"},
-      {key:"MID-3", label:"自然環境保全"}, {key:"MID-4", label:"エネルギー・脱炭素"},
-      {key:"MID-5", label:"その他"} ]},
-  { key:"BIG-5", icon:"🏛️", label:"行政・市民参加・活力", sublabel:"未来を拓く力", baseSubs:[
-      {key:"MID-1", label:"行政の透明性・効率化"}, {key:"MID-2", label:"市民参加・協働"},
-      {key:"MID-3", label:"文化・芸術・スポーツ"}, {key:"MID-4", label:"産業・雇用・にぎわい"},
-      {key:"MID-5", label:"その他"} ]},
+  { key:"BIG-1", icon:"🏙️", label:"まちづくり・都市計画", sublabel:"住みやすさの基盤",
+    baseSubs:["住宅・まちなみ","交通・移動手段","公園・緑地・景観","防災・レジリエンス"] },
+  { key:"BIG-2", icon:"👶", label:"子育て・教育環境", sublabel:"次世代を育てるまち",
+    baseSubs:["保育・教育施設","子ども・若者の居場所","学びの機会（生涯学習）","家族支援"] },
+  { key:"BIG-3", icon:"🤝", label:"福祉・健康・共生", sublabel:"誰も取り残さないまち",
+    baseSubs:["高齢者支援","障害者・多様な人々の支援","健康づくり","地域コミュニティ"] },
+  { key:"BIG-4", icon:"🌳", label:"環境・持続可能性", sublabel:"未来に繋ぐ芦屋",
+    baseSubs:["気候変動対策","資源循環・ごみ問題","自然環境保全","エネルギー・脱炭素"] },
+  { key:"BIG-5", icon:"🏛️", label:"行政・市民参加・活力", sublabel:"未来を拓く力",
+    baseSubs:["行政の透明性・効率化","市民参加・協働","文化・芸術・スポーツ","産業・雇用・にぎわい"] },
 ];
  
 /* 大分類ごとの固定300字ベースビジョン（アイデアの地図・左側） */
@@ -314,32 +314,31 @@ const AI_BASE_SUMMARY = {
 "BIG-5":"市民と行政の協働により、芦屋の新たな価値を創造します。デジタル技術を活用した行政手続きのオンライン化と、データに基づく政策立案を推進します。市民参加型の予算編成やワークショップを拡充し、多様な声を市政に反映します。文化・芸術・スポーツ振興により都市の魅力を高め、スタートアップ支援と観光施策で地域経済を活性化します。透明で効率的な行財政運営により、持続可能な市政を実現します。"
 };
  
-/* 最初の模擬投稿（新統合） */
+/* 最初の模擬投稿（新統合）。中分類はラベル文字列で直接指定。 */
 const SEED_IDEAS = [
-  { big:"BIG-1", mid:"MID-1", title:"静けさと上質を守る、適正規模の住宅政策", summary:"芦屋の魅力は「静けさと上質なまちなみ」です。高層化や画一的な再開発ではなく、木質化や低層のヒューマンスケールを守りながら、若い世代も住める適正規模の住宅政策が必要です。景観を守りつつ、多様な世代が共存できる“未来の芦屋らしさ”をつくるべきです。" },
-  { big:"BIG-1", mid:"MID-2", title:"駅前の安全な動線整備を最優先に", summary:"JR芦屋駅周辺は歩道が狭く、路上駐車も多く危険です。車歩分離、ロータリー整備、駐輪場の再配置など、移動の安全性を最優先すべきです。高齢者・子育て世代・障害者が安心して移動できる交通動線こそ、住みやすさの基盤だと考えます。" },
-  { big:"BIG-1", mid:"MID-3", title:"緑と水を軸にした駅前再開発を", summary:"駅前は芦屋の玄関口です。芝生広場、花壇、木陰、噴水など「緑と水の景観」を中心に据えた再開発が必要です。六甲の自然と連続する緑の軸をつくることで、街のブランド価値が高まります。緑は装飾ではなく、都市の質を決める基盤です。" },
-  { big:"BIG-1", mid:"MID-4", title:"駅前を防災拠点として整備すべき", summary:"災害時の避難スペース、帰宅困難者対応、ヘリポート、地下駐輪場など、駅前は防災拠点としての機能が不可欠です。高層化よりも「安全に強い駅前」を優先すべきです。南北動線の確保や情報発信のDX化も含め、レジリエンスを都市計画の中心に。" },
-  { big:"BIG-2", mid:"MID-1", title:"駅前に保育・子育て相談の集約拠点を", summary:"JR芦屋駅周辺には保育施設が不足しています。通勤動線上に保育園があれば、子育て世代の負担が大幅に減ります。駅前に保育・一時預かり・子育て相談を集約し、「子育てしやすい芦屋」を本気で実現すべきです。" },
-  { big:"BIG-2", mid:"MID-2", title:"子どもと若者のための文化・学び拠点を", summary:"雨の日でも遊べる屋内遊び場、学生の自習室、若者の創作スペースなど、次世代の居場所が圧倒的に不足しています。駅前に「子どもと若者のための文化・学び拠点」をつくることで、街の未来への投資になります。" },
-  { big:"BIG-2", mid:"MID-3", title:"多世代が学べる図書館へ進化を", summary:"図書館は単なる本の置き場ではなく、市民の学びを支える基盤です。カフェ併設、ワークショップ室、ギャラリーなど、多世代が学び続けられる空間を駅前につくるべきです。生涯学習が街の文化レベルを底上げします。" },
-  { big:"BIG-2", mid:"MID-4", title:"家族に優しい設計が街の魅力を左右する", summary:"授乳室、オムツ替え、キッズスペース、ベビーカー動線など、家族に優しい設計が駅前には必要です。子育て世代が「ここなら安心して過ごせる」と感じる環境が、街の魅力を大きく左右します。家族支援は都市の競争力です。" },
-  { big:"BIG-3", mid:"MID-1", title:"高齢者が安心して歩ける駅前整備を", summary:"高齢者が安心して歩ける駅前は、街の基本品質です。段差解消、日陰のベンチ、ゆっくり歩ける広い歩道、下りエスカレーターなど、細やかな配慮が必要です。高齢者が外出しやすい街は、健康寿命が伸び、地域の活力も高まります。" },
-  { big:"BIG-3", mid:"MID-2", title:"誰も取り残さないユニバーサルデザインを", summary:"障害者用の乗降スペースが不足しており、駅前は使いづらい状況です。車椅子・ベビーカー・視覚障害者が安心して移動できるユニバーサルデザインを徹底すべきです。誰も取り残さない駅前こそ、芦屋の品格を示します。" },
-  { big:"BIG-3", mid:"MID-3", title:"歩いて健康になれる駅前空間を", summary:"駅前にウォーキングしやすい動線や、軽運動ができる広場があれば、市民の健康づくりが進みます。緑の中で体を動かせる環境は、医療費削減にもつながる重要な投資です。健康を中心に据えた都市設計が必要です。" },
-  { big:"BIG-3", mid:"MID-4", title:"気軽に集まれるコミュニティ拠点を", summary:"市民が気軽に集まれる小さな会議室や多目的スペースが不足しています。地域活動が活発になると、街の安全性や文化レベルが向上します。駅前に「コミュニティの拠点」を設けることで、街のつながりが強くなります。" },
-  { big:"BIG-4", mid:"MID-1", title:"緑化・木陰で気候変動に強い駅前を", summary:"駅前の緑化、木陰、打ち水空間、木質化は、気候変動対策としても有効です。ヒートアイランドを抑え、歩きやすい環境をつくることが未来の都市の必須条件です。環境配慮を「見える形」で示すことが芦屋のブランドになります。" },
-  { big:"BIG-4", mid:"MID-2", title:"循環型素材の活用とごみ削減を駅前から", summary:"駅前の再開発では、廃材の再利用や循環型素材の活用を進めるべきです。ごみ削減やリサイクルの仕組みを施設内に組み込むことで、市民の行動変容も促せます。循環型社会を駅前から発信することが重要です。" },
-  { big:"BIG-4", mid:"MID-3", title:"六甲・芦屋川と繋がるエコロジカルネットワークを", summary:"六甲山・芦屋川の自然と駅前の緑をつなぐ「エコロジカルネットワーク」をつくるべきです。自然と都市が共存する街は、住民の幸福度が高く、子どもの感性も育ちます。自然環境を都市の中心に据える発想が必要です。" },
-  { big:"BIG-4", mid:"MID-4", title:"太陽光・蓄電池で脱炭素モデル地区に", summary:"駅前施設に太陽光、蓄電池、EV充電などを導入し、脱炭素のモデル地区にすべきです。エネルギーの地産地消は災害時の強さにもつながります。未来の都市として、芦屋が先進的な取り組みを示すべきです。" },
-  { big:"BIG-5", mid:"MID-1", title:"再開発プロセスの見える化を", summary:"再開発の検討過程が不透明だという声が多くあります。事業費、契約、意思決定プロセスを市民に公開し、DXで見える化することが信頼回復の第一歩です。透明性は行政の最大の資産です。" },
-  { big:"BIG-5", mid:"MID-2", title:"共創型まちづくりへ市民参加を拡大", summary:"市民の声を反映した再開発こそ、長期的に支持される計画になります。若者・子育て世代・高齢者が参加できるワークショップを定期開催し、共創型のまちづくりを進めるべきです。市民参加はコストではなく価値です。" },
-  { big:"BIG-5", mid:"MID-3", title:"文化拠点としての駅前整備を", summary:"駅前にギャラリー、音楽ステージ、アートスペースがあれば、芦屋の文化レベルが一段上がります。文化は街の魅力を決める基盤であり、観光や交流人口の増加にもつながります。文化を中心に据えた再開発を望みます。" },
-  { big:"BIG-5", mid:"MID-4", title:"若い働き手を呼ぶ産業支援拠点を", summary:"駅前にコワーキング、シェアオフィス、スタートアップ支援拠点を設ければ、若い働き手が集まり、街に新しい活力が生まれます。商業の焼き増しではなく、未来の産業を育てる駅前にすることが芦屋の成長戦略です。" },
+  { big:"BIG-1", mid:"住宅・まちなみ", title:"静けさと上質を守る、適正規模の住宅政策", summary:"芦屋の魅力は「静けさと上質なまちなみ」です。高層化や画一的な再開発ではなく、木質化や低層のヒューマンスケールを守りながら、若い世代も住める適正規模の住宅政策が必要です。景観を守りつつ、多様な世代が共存できる“未来の芦屋らしさ”をつくるべきです。" },
+  { big:"BIG-1", mid:"交通・移動手段", title:"駅前の安全な動線整備を最優先に", summary:"JR芦屋駅周辺は歩道が狭く、路上駐車も多く危険です。車歩分離、ロータリー整備、駐輪場の再配置など、移動の安全性を最優先すべきです。高齢者・子育て世代・障害者が安心して移動できる交通動線こそ、住みやすさの基盤だと考えます。" },
+  { big:"BIG-1", mid:"公園・緑地・景観", title:"緑と水を軸にした駅前再開発を", summary:"駅前は芦屋の玄関口です。芝生広場、花壇、木陰、噴水など「緑と水の景観」を中心に据えた再開発が必要です。六甲の自然と連続する緑の軸をつくることで、街のブランド価値が高まります。緑は装飾ではなく、都市の質を決める基盤です。" },
+  { big:"BIG-1", mid:"防災・レジリエンス", title:"駅前を防災拠点として整備すべき", summary:"災害時の避難スペース、帰宅困難者対応、ヘリポート、地下駐輪場など、駅前は防災拠点としての機能が不可欠です。高層化よりも「安全に強い駅前」を優先すべきです。南北動線の確保や情報発信のDX化も含め、レジリエンスを都市計画の中心に。" },
+  { big:"BIG-2", mid:"保育・教育施設", title:"駅前に保育・子育て相談の集約拠点を", summary:"JR芦屋駅周辺には保育施設が不足しています。通勤動線上に保育園があれば、子育て世代の負担が大幅に減ります。駅前に保育・一時預かり・子育て相談を集約し、「子育てしやすい芦屋」を本気で実現すべきです。" },
+  { big:"BIG-2", mid:"子ども・若者の居場所", title:"子どもと若者のための文化・学び拠点を", summary:"雨の日でも遊べる屋内遊び場、学生の自習室、若者の創作スペースなど、次世代の居場所が圧倒的に不足しています。駅前に「子どもと若者のための文化・学び拠点」をつくることで、街の未来への投資になります。" },
+  { big:"BIG-2", mid:"学びの機会（生涯学習）", title:"多世代が学べる図書館へ進化を", summary:"図書館は単なる本の置き場ではなく、市民の学びを支える基盤です。カフェ併設、ワークショップ室、ギャラリーなど、多世代が学び続けられる空間を駅前につくるべきです。生涯学習が街の文化レベルを底上げします。" },
+  { big:"BIG-2", mid:"家族支援", title:"家族に優しい設計が街の魅力を左右する", summary:"授乳室、オムツ替え、キッズスペース、ベビーカー動線など、家族に優しい設計が駅前には必要です。子育て世代が「ここなら安心して過ごせる」と感じる環境が、街の魅力を大きく左右します。家族支援は都市の競争力です。" },
+  { big:"BIG-3", mid:"高齢者支援", title:"高齢者が安心して歩ける駅前整備を", summary:"高齢者が安心して歩ける駅前は、街の基本品質です。段差解消、日陰のベンチ、ゆっくり歩ける広い歩道、下りエスカレーターなど、細やかな配慮が必要です。高齢者が外出しやすい街は、健康寿命が伸び、地域の活力も高まります。" },
+  { big:"BIG-3", mid:"障害者・多様な人々の支援", title:"誰も取り残さないユニバーサルデザインを", summary:"障害者用の乗降スペースが不足しており、駅前は使いづらい状況です。車椅子・ベビーカー・視覚障害者が安心して移動できるユニバーサルデザインを徹底すべきです。誰も取り残さない駅前こそ、芦屋の品格を示します。" },
+  { big:"BIG-3", mid:"健康づくり", title:"歩いて健康になれる駅前空間を", summary:"駅前にウォーキングしやすい動線や、軽運動ができる広場があれば、市民の健康づくりが進みます。緑の中で体を動かせる環境は、医療費削減にもつながる重要な投資です。健康を中心に据えた都市設計が必要です。" },
+  { big:"BIG-3", mid:"地域コミュニティ", title:"気軽に集まれるコミュニティ拠点を", summary:"市民が気軽に集まれる小さな会議室や多目的スペースが不足しています。地域活動が活発になると、街の安全性や文化レベルが向上します。駅前に「コミュニティの拠点」を設けることで、街のつながりが強くなります。" },
+  { big:"BIG-4", mid:"気候変動対策", title:"緑化・木陰で気候変動に強い駅前を", summary:"駅前の緑化、木陰、打ち水空間、木質化は、気候変動対策としても有効です。ヒートアイランドを抑え、歩きやすい環境をつくることが未来の都市の必須条件です。環境配慮を「見える形」で示すことが芦屋のブランドになります。" },
+  { big:"BIG-4", mid:"資源循環・ごみ問題", title:"循環型素材の活用とごみ削減を駅前から", summary:"駅前の再開発では、廃材の再利用や循環型素材の活用を進めるべきです。ごみ削減やリサイクルの仕組みを施設内に組み込むことで、市民の行動変容も促せます。循環型社会を駅前から発信することが重要です。" },
+  { big:"BIG-4", mid:"自然環境保全", title:"六甲・芦屋川と繋がるエコロジカルネットワークを", summary:"六甲山・芦屋川の自然と駅前の緑をつなぐ「エコロジカルネットワーク」をつくるべきです。自然と都市が共存する街は、住民の幸福度が高く、子どもの感性も育ちます。自然環境を都市の中心に据える発想が必要です。" },
+  { big:"BIG-4", mid:"エネルギー・脱炭素", title:"太陽光・蓄電池で脱炭素モデル地区に", summary:"駅前施設に太陽光、蓄電池、EV充電などを導入し、脱炭素のモデル地区にすべきです。エネルギーの地産地消は災害時の強さにもつながります。未来の都市として、芦屋が先進的な取り組みを示すべきです。" },
+  { big:"BIG-5", mid:"行政の透明性・効率化", title:"再開発プロセスの見える化を", summary:"再開発の検討過程が不透明だという声が多くあります。事業費、契約、意思決定プロセスを市民に公開し、DXで見える化することが信頼回復の第一歩です。透明性は行政の最大の資産です。" },
+  { big:"BIG-5", mid:"市民参加・協働", title:"共創型まちづくりへ市民参加を拡大", summary:"市民の声を反映した再開発こそ、長期的に支持される計画になります。若者・子育て世代・高齢者が参加できるワークショップを定期開催し、共創型のまちづくりを進めるべきです。市民参加はコストではなく価値です。" },
+  { big:"BIG-5", mid:"文化・芸術・スポーツ", title:"文化拠点としての駅前整備を", summary:"駅前にギャラリー、音楽ステージ、アートスペースがあれば、芦屋の文化レベルが一段上がります。文化は街の魅力を決める基盤であり、観光や交流人口の増加にもつながります。文化を中心に据えた再開発を望みます。" },
+  { big:"BIG-5", mid:"産業・雇用・にぎわい", title:"若い働き手を呼ぶ産業支援拠点を", summary:"駅前にコワーキング、シェアオフィス、スタートアップ支援拠点を設ければ、若い働き手が集まり、街に新しい活力が生まれます。商業の焼き増しではなく、未来の産業を育てる駅前にすることが芦屋の成長戦略です。" },
 ];
  
 let ideas = [];
-let dynamicSubs = []; // {key, big, label, createdAt}
 let openCat = null;
 let pendingResult = null;
  
@@ -355,103 +354,146 @@ function showPage(id, btn){
   if(id==='assist'){ loadGasUrl(); }
 }
  
-/* ===================== STORAGE ===================== */
-async function loadIdeas(){
-  try{
-    const res = await window.storage.get('ashiya_voice_ideas_v2', true);
-    ideas = res ? JSON.parse(res.value) : null;
-  }catch(e){ ideas = null; }
-  if(ideas === null){
-    ideas = SEED_IDEAS.map((s,i)=>({
-      id:'seed_'+i, title:s.title, summary:s.summary,
-      core:"", change:"", success:"", concern:"", question:"",
-      big:s.big, mid:s.mid, themeTag:"", raw:s.summary,
-      type:'seed', status:'active', mergedFrom:null, mergeReason:"",
-      ts: Date.now() - (SEED_IDEAS.length-i)*86400000
-    }));
-    await saveIdeas();
+/* ===================== 連携URL（このブラウザのみの上書き設定） ===================== */
+function loadGasUrl(){
+  let stored = '';
+  try{ stored = localStorage.getItem('ashiya_gas_url') || ''; }catch(e){}
+  gasUrl = stored || GAS_URL_DEFAULT;
+  const input = document.getElementById('gasUrlInput');
+  const status = document.getElementById('gasUrlStatus');
+  if(input) input.value = gasUrl;
+  if(status){
+    status.textContent = gasUrl
+      ? "設定済み：AI分析・スプレッドシート記録の両方がこのURL経由で動作します。"
+      : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
   }
 }
-async function saveIdeas(){
-  try{ await window.storage.set('ashiya_voice_ideas_v2', JSON.stringify(ideas), true); }
-  catch(e){ console.error('storage error', e); }
+function saveGasUrl(){
+  const input = document.getElementById('gasUrlInput');
+  gasUrl = input.value.trim();
+  try{ localStorage.setItem('ashiya_gas_url', gasUrl); }catch(e){}
+  document.getElementById('gasUrlStatus').textContent = gasUrl
+    ? "保存しました（このブラウザのみ有効）。全員に自動反映したい場合は、コード内のGAS_URL_DEFAULTにこのURLを直接貼り付けて再公開してください。"
+    : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
 }
-async function loadDynamicSubs(){
-  try{
-    const res = await window.storage.get('ashiya_dynamic_subs_v2', true);
-    dynamicSubs = res ? JSON.parse(res.value) : [];
-  }catch(e){ dynamicSubs = []; }
-}
-async function saveDynamicSubs(){
-  try{ await window.storage.set('ashiya_dynamic_subs_v2', JSON.stringify(dynamicSubs), true); }
-  catch(e){ console.error('storage error', e); }
-}
-function getSubs(bigKey){
-  const base = CATEGORIES.find(c=>c.key===bigKey).baseSubs;
-  const dyn = dynamicSubs.filter(d=>d.big===bigKey).map(d=>({key:d.key, label:d.label, dynamic:true}));
-  return [...base.filter(s=>s.key!=='MID-5'), ...dyn, base.find(s=>s.key==='MID-5')];
+function genAuthorId(name){
+  const base = (name||'anon').replace(/\s+/g,'').slice(0,12);
+  return base + '_' + Math.random().toString(36).slice(2,8);
 }
  
-/* ===================== AI CALL (proxied through Apps Script → Groq/Llama) ===================== */
+/* ===================== データ層：スプレッドシートを唯一の情報源として読み込む ===================== */
+function seedIdeas(){
+  return SEED_IDEAS.map((s,i)=>({
+    id:'seed_'+i, ts: Date.now() - (SEED_IDEAS.length-i)*86400000,
+    big:s.big, mid:s.mid, themeTag:'', title:s.title, summary:s.summary, raw:s.summary,
+    core:'', change:'', success:'', concern:'', question:'',
+    crossAnalysis:'', mergeReason:'',
+    type:'seed', status:'active', mergedIntoTitle:'', authorName:'', authorId:''
+  }));
+}
+ 
+function rowToIdea(r){
+  const [ts,bigLabel,title,summary,raw,themeTag,midLabel,statusStr,mergedIntoTitle,processNarrative,crossAnalysis,authorName,perspJson,reasonText,authorId] = r;
+  if(!title) return null;
+  const bigDef = CATEGORIES.find(c=>c.label===bigLabel);
+  if(!bigDef) return null;
+  let persp = {};
+  try{ persp = JSON.parse(perspJson||'{}'); }catch(e){}
+  const statusText = String(statusStr||'');
+  const isArchived = /アーカイブ|元記事/.test(statusText);
+  const isMerged = /新統合/.test(statusText);
+  return {
+    id:String(ts), ts: Date.parse(ts) || Date.now(),
+    big: bigDef.key,
+    mid: bigDef.baseSubs.includes(midLabel) ? midLabel : OTHER_LABEL,
+    themeTag: themeTag || '',
+    title, summary, raw,
+    core:persp.core||'', change:persp.change||'', success:persp.success||'', concern:persp.concern||'', question:persp.question||'',
+    crossAnalysis: crossAnalysis||'', mergeReason: reasonText||'',
+    type: isMerged ? 'merged' : 'proposal',
+    status: isArchived ? 'archived' : 'active',
+    mergedIntoTitle: mergedIntoTitle||'',
+    authorName: authorName||'', authorId: authorId||''
+  };
+}
+ 
+async function fetchSheetIdeas(){
+  if(!gasUrl) return [];
+  try{
+    const res = await fetch(gasUrl); // GET
+    const data = await res.json();
+    if(!data.ok || !Array.isArray(data.rows)) return [];
+    return data.rows.map(rowToIdea).filter(Boolean);
+  }catch(e){ console.error('sheet fetch failed', e); return []; }
+}
+ 
+// 常に「模擬投稿(seed)」＋「スプレッドシートの最新内容」を組み合わせて再構築する（＝スプレッドシートが実体）
+async function loadIdeas(){
+  const fromSheet = await fetchSheetIdeas();
+  ideas = [...seedIdeas(), ...fromSheet];
+}
+ 
+function computeDynamicSubs(bigKey){
+  const others = ideas.filter(i=>i.big===bigKey && i.mid===OTHER_LABEL && i.status==='active' && i.themeTag);
+  const groups = {};
+  others.forEach(o=>{ const k=o.themeTag.trim(); if(!k) return; groups[k]=groups[k]||[]; groups[k].push(o); });
+  return Object.keys(groups).filter(k=>groups[k].length>=3).map(k=>({label:k, dynamic:true}));
+}
+function getSubs(bigKey){
+  const base = CATEGORIES.find(c=>c.key===bigKey).baseSubs.map(label=>({label, dynamic:false}));
+  const dyn = computeDynamicSubs(bigKey);
+  return [...base, ...dyn, {label:OTHER_LABEL, dynamic:false}];
+}
+function ideasForSub(bigKey, sub){
+  if(sub.dynamic){
+    return ideas.filter(i=>i.big===bigKey && i.mid===OTHER_LABEL && i.status==='active' && i.themeTag && i.themeTag.trim()===sub.label);
+  }
+  if(sub.label===OTHER_LABEL){
+    const dynLabels = computeDynamicSubs(bigKey).map(d=>d.label);
+    return ideas.filter(i=>i.big===bigKey && i.mid===OTHER_LABEL && i.status==='active' && !(i.themeTag && dynLabels.includes(i.themeTag.trim())));
+  }
+  return ideas.filter(i=>i.big===bigKey && i.mid===sub.label && i.status==='active');
+}
+ 
+/* ===================== AI CALL (Apps Script経由 → Groq/Llama) ===================== */
 async function callGroq(systemPrompt, userText, wantJson){
   if(!gasUrl){ throw new Error('連携設定でGoogle Apps ScriptのURLを保存してください（AI分析はこのURL経由で実行されます）。'); }
   const response = await fetch(gasUrl, {
     method:'POST',
-    headers:{'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight against Apps Script
+    headers:{'Content-Type':'text/plain;charset=utf-8'}, // Apps Script側でのCORSプリフライト回避
     body: JSON.stringify({ action:'groqProxy', systemPrompt, userText, wantJson: !!wantJson })
   });
   const data = await response.json();
   if(!data.ok){ throw new Error(data.error || 'AI呼び出しに失敗しました。'); }
   return data.content;
 }
-let gasUrl = "";
-async function loadGasUrl(){
-  try{
-    const res = await window.storage.get('ashiya_gas_url', false);
-    gasUrl = res ? res.value : "";
-  }catch(e){ gasUrl = ""; }
-  const input = document.getElementById('gasUrlInput');
-  const status = document.getElementById('gasUrlStatus');
-  if(input) input.value = gasUrl;
-  if(status) status.textContent = gasUrl ? "設定済み：AI分析・スプレッドシート記録の両方がこのURL経由で動作します。" : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
-}
-async function saveGasUrl(){
-  const input = document.getElementById('gasUrlInput');
-  gasUrl = input.value.trim();
-  try{ await window.storage.set('ashiya_gas_url', gasUrl, false); }catch(e){}
-  document.getElementById('gasUrlStatus').textContent = gasUrl ? "設定済み：AI分析・スプレッドシート記録の両方がこのURL経由で動作します。" : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
-}
-function genAuthorId(name){
-  const base = (name||'anon').replace(/\s+/g,'').slice(0,12);
-  return base + '_' + Math.random().toString(36).slice(2,8);
-}
 async function sheetPost(payload){
   if(!gasUrl) return;
   try{
     await fetch(gasUrl, {
       method:'POST',
-      headers:{'Content-Type':'text/plain;charset=utf-8'}, // avoids CORS preflight against Apps Script
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
       body: JSON.stringify(payload)
     });
   }catch(e){ console.error('sheet log failed', e); }
 }
 function logAppendRow(idea, statusText, mergedIntoTitle, processNarrative, authorName, authorId){
   const row = [
-    new Date(idea.ts).toISOString(),          // A タイムスタンプ
-    CATEGORIES.find(c=>c.key===idea.big)?.label || idea.big, // B 大分類
-    idea.title,                                // C 推奨タイトル
-    idea.summary,                              // D 200字要約
-    idea.raw,                                  // E 元の投稿文
-    "",                                         // F 空
-    getSubs(idea.big).find(s=>s.key===idea.mid)?.label || idea.mid, // G 中分類
-    statusText,                                // H status
-    mergedIntoTitle || "",                     // I 統合先タイトル
-    processNarrative || "",                    // J 統合プロセス経緯
-    idea.crossAnalysis || "",                  // K 全体クロス分析結果
-    authorName || "匿名",                       // L 投稿者名
-    JSON.stringify({core:idea.core, change:idea.change, success:idea.success, concern:idea.concern, question:idea.question}), // M AI分析深掘り(JSON)
-    idea.mergeReason || idea.placementReason || "", // N 統合・配置理由
-    authorId || ""                             // O authorId
+    new Date(idea.ts).toISOString(),                          // A タイムスタンプ
+    CATEGORIES.find(c=>c.key===idea.big)?.label || idea.big,   // B 大分類
+    idea.title,                                                // C 推奨タイトル
+    idea.summary,                                              // D 200字要約
+    idea.raw,                                                  // E 元の投稿文
+    idea.themeTag || "",                                       // F その他の実質テーマ（自動中分類生成の判定に使用）
+    idea.mid,                                                  // G 中分類
+    statusText,                                                // H status
+    mergedIntoTitle || "",                                     // I 統合先タイトル
+    processNarrative || "",                                    // J 統合プロセス経緯
+    idea.crossAnalysis || "",                                  // K 全体クロス分析結果
+    authorName || "匿名",                                       // L 投稿者名
+    JSON.stringify({core:idea.core, change:idea.change, success:idea.success, concern:idea.concern, question:idea.question}), // M
+    idea.mergeReason || idea.placementReason || "",            // N 統合・配置理由
+    authorId || ""                                             // O authorId
   ];
   return sheetPost({ action:'append', row });
 }
@@ -459,17 +501,17 @@ function logArchiveUpdate(oldIdea, mergedIntoTitle){
   return sheetPost({ action:'archive', timestamp:new Date(oldIdea.ts).toISOString(), status:'元記事（アーカイブ）', mergedIntoTitle });
 }
  
-/* ===================== AI: CLASSIFY + 5-PERSPECTIVE ANALYSIS ===================== */
+/* ===================== AI: CLASSIFY + 5視点分析 ===================== */
 async function classifyAI(text){
   const catList = CATEGORIES.map(c=>{
-    const subs = getSubs(c.key).map(s=>`${s.key}:${s.label}`).join('、');
+    const subs = getSubs(c.key).map(s=>s.label).join('、');
     return `${c.key}(${c.label})の中分類→ ${subs}`;
   }).join(' / ');
  
   const systemPrompt = `あなたは「市民の声でつくる、芦屋の明日」の分析アシスタントです。ユーザーの自由記述を読み取り、次のJSON形式のみを出力してください（前置き・コードブロック・説明文は一切不要、JSONのみ）。
  
 出力形式:
-{"bigCategory":"BIG-1〜BIG-5のいずれか","bigLabel":"大分類の日本語名","midCategory":"下記一覧のkey。どれにも当てはまらない場合は各大分類のその他(MID-5)","midLabel":"中分類の日本語名","otherThemeTag":"midCategoryがその他(MID-5)の場合のみ、10〜15字程度でこの投稿の実質的テーマ名を入れる。それ以外は空文字","title":"推奨タイトル。20文字以内。","summary200":"要約200。190〜200文字。","core":"核心。150〜200文字。","change":"変化。150〜200文字。","success":"成功事例。150〜200文字。","concern":"懸念点。150〜200文字。","question":"問い。150〜200文字。","crossAnalysis":"全体クロス分析。この投稿が大分類全体のベースビジョンや他のテーマとどう関係するかを100〜150文字で。","placementReason":"この大分類・中分類に分類した理由を100〜150文字で。"}
+{"bigCategory":"BIG-1〜BIG-5のいずれか","bigLabel":"大分類の日本語名","midLabel":"下記一覧の中分類ラベルそのもの。どれにも当てはまらない場合は各大分類の「その他」","otherThemeTag":"midLabelが「その他」の場合のみ、10〜15字程度でこの投稿の実質的テーマ名を入れる。それ以外は空文字","title":"推奨タイトル。20文字以内。","summary200":"要約200。190〜200文字。","core":"核心。150〜200文字。","change":"変化。150〜200文字。","success":"成功事例。150〜200文字。","concern":"懸念点。150〜200文字。","question":"問い。150〜200文字。","crossAnalysis":"全体クロス分析。この投稿が大分類全体のベースビジョンや他のテーマとどう関係するかを100〜150文字で。","placementReason":"この大分類・中分類に分類した理由を100〜150文字で。"}
  
 大分類と中分類の一覧: ${catList}`;
  
@@ -513,7 +555,7 @@ async function runAI(){
   const slip = document.getElementById('slip');
   runBtn.disabled = true; loading.style.display='inline';
   slip.innerHTML = '<p class="slip-empty">AIが5つの視点で読み解いています…</p>';
-  await loadDynamicSubs();
+  await loadIdeas();
   try{
     const r = await classifyAI(text);
     pendingResult = { ...r, raw:text };
@@ -562,65 +604,57 @@ async function postIdea(){
   postBtn.disabled = true;
   statusEl.innerHTML = '<p class="loading" style="margin-top:10px;">統合判定中…</p>';
   await loadIdeas();
-  await loadDynamicSubs();
  
   const r = pendingResult;
   const authorName = (document.getElementById('authorName')?.value || '').trim();
   const authorId = genAuthorId(authorName);
-  let big = r.bigCategory, mid = r.midCategory;
- 
-  // その他判定：既に同じテーマ名の動的中分類があれば直接そこへ
-  if(mid === 'MID-5' && r.otherThemeTag){
-    const existingDyn = dynamicSubs.find(d=>d.big===big && d.label.trim()===r.otherThemeTag.trim());
-    if(existingDyn) mid = existingDyn.key;
-  }
+  const big = r.bigCategory;
+  const bigDef = CATEGORIES.find(c=>c.key===big);
+  const mid = (bigDef && bigDef.baseSubs.includes(r.midLabel)) ? r.midLabel : OTHER_LABEL;
+  const themeTag = (mid===OTHER_LABEL) ? (r.otherThemeTag||'') : '';
  
   let mergedInfo = null;
  
-  if(mid !== 'MID-5'){
+  if(mid !== OTHER_LABEL){
     const activeInBucket = ideas.filter(i=>i.big===big && i.mid===mid && i.status==='active');
     if(activeInBucket.length > 0){
       try{
         const md = await mergeDecisionAI(activeInBucket, {title:r.title, summary200:r.summary200, raw:r.raw});
         if(md.match && md.matchedId){
           const matched = ideas.find(i=>i.id===md.matchedId);
-          if(matched){ matched.status='archived'; matched.archivedAt = Date.now(); }
           const newArticle = {
-            id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+            id:new Date().toISOString(), ts: Date.now(),
             title:md.title, summary:md.summary200,
             core:md.core, change:md.change, success:md.success, concern:md.concern, question:md.question,
             big, mid, themeTag:'', raw:r.raw, crossAnalysis:r.crossAnalysis||'',
-            type:'merged', status:'active', mergedFrom: matched? matched.id : null,
-            mergeReason: md.mergeReason, ts: Date.now()
+            type:'merged', status:'active', mergedIntoTitle:'',
+            mergeReason: md.mergeReason, authorName, authorId
           };
           ideas.push(newArticle);
           mergedInfo = { matchedTitle: matched?matched.title:'', newTitle: md.title, reason: md.mergeReason };
           if(matched) await logArchiveUpdate(matched, md.title);
           await logAppendRow(newArticle, '新統合（アクティブ）', '', `「${matched?matched.title:''}」に新しい提案を統合`, authorName, authorId);
         } else {
-          const art = makeStandaloneArticle(r, big, mid, '');
+          const art = makeStandaloneArticle(r, big, mid, '', authorName, authorId);
           ideas.push(art);
           await logAppendRow(art, '新提案（アクティブ）', '', '', authorName, authorId);
         }
       }catch(e){
         console.error(e);
-        const art = makeStandaloneArticle(r, big, mid, '');
+        const art = makeStandaloneArticle(r, big, mid, '', authorName, authorId);
         ideas.push(art);
         await logAppendRow(art, '新提案（アクティブ）', '', '', authorName, authorId);
       }
     } else {
-      const art = makeStandaloneArticle(r, big, mid, '');
+      const art = makeStandaloneArticle(r, big, mid, '', authorName, authorId);
       ideas.push(art);
       await logAppendRow(art, '新提案（アクティブ）', '', '', authorName, authorId);
     }
   } else {
-    const art = makeStandaloneArticle(r, big, mid, r.otherThemeTag||'');
+    const art = makeStandaloneArticle(r, big, mid, themeTag, authorName, authorId);
     ideas.push(art);
     await logAppendRow(art, '新提案（その他・アクティブ）', '', '', authorName, authorId);
-    await checkOtherClustering(big);
   }
- 
-  await saveIdeas();
  
   if(mergedInfo){
     statusEl.innerHTML = `<div class="merge-banner">🔗「${escapeHtml(mergedInfo.matchedTitle)}」と統合され、新しい統合記事「${escapeHtml(mergedInfo.newTitle)}」になりました。<br>統合理由：${escapeHtml(mergedInfo.reason)}</div>`;
@@ -631,29 +665,15 @@ async function postIdea(){
   pendingResult = null;
 }
  
-function makeStandaloneArticle(r, big, mid, themeTag){
+function makeStandaloneArticle(r, big, mid, themeTag, authorName, authorId){
   return {
-    id:'id_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+    id:new Date().toISOString(), ts:Date.now(),
     title:r.title, summary:r.summary200,
     core:r.core, change:r.change, success:r.success, concern:r.concern, question:r.question,
     big, mid, themeTag, raw:r.raw,
     crossAnalysis:r.crossAnalysis||'', placementReason:r.placementReason||'',
-    type:'proposal', status:'active', mergedFrom:null, mergeReason:'', ts:Date.now()
+    type:'proposal', status:'active', mergedIntoTitle:'', mergeReason:'', authorName, authorId
   };
-}
- 
-async function checkOtherClustering(big){
-  const others = ideas.filter(i=>i.big===big && i.mid==='MID-5' && i.status==='active' && i.themeTag);
-  const groups = {};
-  others.forEach(o=>{ const k=o.themeTag.trim(); groups[k]=groups[k]||[]; groups[k].push(o); });
-  for(const tag in groups){
-    if(groups[tag].length >= 3 && !dynamicSubs.find(d=>d.big===big && d.label.trim()===tag)){
-      const newKey = 'MID-D-' + Date.now();
-      dynamicSubs.push({key:newKey, big, label:tag, createdAt:Date.now()});
-      groups[tag].forEach(o=>{ o.mid = newKey; });
-    }
-  }
-  await saveDynamicSubs();
 }
  
 function cancelPost(){
@@ -709,7 +729,6 @@ async function toggleUpdate(bigKey){
 /* ===================== VOICE BOARD RENDER ===================== */
 async function renderBoard(){
   await loadIdeas();
-  await loadDynamicSubs();
   const grid = document.getElementById('corkGrid');
   grid.innerHTML = CATEGORIES.map(c=>{
     const count = ideas.filter(i=>i.big===c.key && i.status==='active').length;
@@ -734,11 +753,11 @@ function renderDetail(){
   panel.style.display='block';
   panel.innerHTML = `<div class="detail-title">${cat.icon} ${cat.label}｜${cat.sublabel}</div>` +
     subs.map(s=>{
-      const list = ideas.filter(i=>i.big===cat.key && i.mid===s.key && i.status==='active');
+      const list = ideasForSub(cat.key, s);
       return `
         <div class="sub-block">
           <div class="sub-head" onclick="toggleSub(event,this)">
-            <span>${s.label}${s.dynamic?'<span class="dynamic-flag">自動生成</span>':''}</span>
+            <span>${escapeHtml(s.label)}${s.dynamic?'<span class="dynamic-flag">自動生成</span>':''}</span>
             <span class="mono" style="font-size:12px;color:#7c8172;">${list.length}件 ▾</span>
           </div>
           <div class="sub-body">
@@ -757,11 +776,12 @@ function typeBadge(type){
 function ideaNoteHtml(i){
   const d = new Date(i.ts);
   const dateStr = d.getFullYear()+'/'+(d.getMonth()+1)+'/'+d.getDate();
+  const safeId = i.id.replace(/[^a-zA-Z0-9_-]/g,'_');
   return `
-    <div class="idea-note ${i.type==='seed'?'seed':''} ${i.type==='merged'?'merged':''}" onclick="toggleFull(this,'${i.id}')">
+    <div class="idea-note ${i.type==='seed'?'seed':''} ${i.type==='merged'?'merged':''}" onclick="toggleFull(this,'${i.id.replace(/'/g,"\\'")}')">
       <div class="t">${escapeHtml(i.title)} ${typeBadge(i.type)}</div>
-      <div class="m">${dateStr}</div>
-      <div class="idea-full" id="full-${i.id}"></div>
+      <div class="m">${dateStr}${i.authorName?'・'+escapeHtml(i.authorName):''}</div>
+      <div class="idea-full" id="full-${safeId}"></div>
     </div>`;
 }
  
@@ -784,7 +804,7 @@ function toggleFull(noteEl, id){
   if(i.type==='merged' && i.mergeReason){
     html += `<div class="mreason"><b>統合理由：</b>${escapeHtml(i.mergeReason)}</div>`;
   }
-  const archived = collectArchivedChain(i.id);
+  const archived = collectArchivedChain(i);
   if(archived.length){
     html += `<div class="archive-toggle" onclick="event.stopPropagation();this.nextElementSibling.style.display=(this.nextElementSibling.style.display==='block'?'none':'block');">📁 元記事を見る（${archived.length}件）</div>
       <div class="archive-list">${archived.map(a=>`<div class="archive-item"><div class="at">${escapeHtml(a.title)}</div><div class="as">${escapeHtml(a.summary)}</div></div>`).join('')}</div>`;
@@ -794,14 +814,16 @@ function toggleFull(noteEl, id){
   full.style.display = 'block';
 }
  
-function collectArchivedChain(startId){
+// 「統合先タイトル」列の逆引きで、元記事の履歴をたどる
+function collectArchivedChain(article){
   const result = [];
-  let current = ideas.find(x=>x.id===startId);
-  while(current && current.mergedFrom){
-    const prev = ideas.find(x=>x.id===current.mergedFrom);
+  let currentTitle = article.title;
+  let guard = 0;
+  while(guard++ < 20){
+    const prev = ideas.find(i=>i.status==='archived' && i.mergedIntoTitle && i.mergedIntoTitle.trim()===currentTitle.trim());
     if(!prev) break;
     result.push(prev);
-    current = prev;
+    currentTitle = prev.title;
   }
   return result;
 }
@@ -818,9 +840,8 @@ function escapeHtml(str){
  
 /* ===================== INIT ===================== */
 (async function init(){
+  loadGasUrl();
   await loadIdeas();
-  await loadDynamicSubs();
-  await loadGasUrl();
   renderMapUpdate();
 })();
 </script>
