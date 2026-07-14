@@ -289,6 +289,8 @@ textarea:focus{outline:none;}
 // このブラウザだけの一時的な動作確認用の上書きです）。
 const GAS_URL_DEFAULT = "https://script.google.com/macros/s/AKfycbwIso-Q30s0TcLQHeOM9hLs0m2kpufrCbXamqMseZCS-eLLTZxo0zT0ASv5qr82pd4xRA/exec";
 let gasUrl = GAS_URL_DEFAULT;
+// このサイト（パス）専用のローカル保存キー。ドメインを共有する他サイトへ設定が漏れないようにする。
+const GAS_STORAGE_KEY = 'ashiya_gas_url::' + location.pathname;
  
 /* ===================== BASE CATEGORY DEFINITIONS ===================== */
 const OTHER_LABEL = "その他";
@@ -357,7 +359,7 @@ function showPage(id, btn){
 /* ===================== 連携URL（このブラウザのみの上書き設定） ===================== */
 function loadGasUrl(){
   let stored = '';
-  try{ stored = localStorage.getItem('ashiya_gas_url') || ''; }catch(e){}
+  try{ stored = localStorage.getItem(GAS_STORAGE_KEY) || ''; }catch(e){}
   gasUrl = stored || GAS_URL_DEFAULT;
   const input = document.getElementById('gasUrlInput');
   const status = document.getElementById('gasUrlStatus');
@@ -371,7 +373,7 @@ function loadGasUrl(){
 function saveGasUrl(){
   const input = document.getElementById('gasUrlInput');
   gasUrl = input.value.trim();
-  try{ localStorage.setItem('ashiya_gas_url', gasUrl); }catch(e){}
+  try{ localStorage.setItem(GAS_STORAGE_KEY, gasUrl); }catch(e){}
   document.getElementById('gasUrlStatus').textContent = gasUrl
     ? "保存しました（このブラウザのみ有効）。全員に自動反映したい場合は、コード内のGAS_URL_DEFAULTにこのURLを直接貼り付けて再公開してください。"
     : "未設定：AI分析・スプレッドシート記録のどちらも動作しません。";
@@ -844,8 +846,6 @@ function escapeHtml(str){
   await loadIdeas();
   renderMapUpdate();
 })();
-
-
 </script>
 </body>
 </html>
