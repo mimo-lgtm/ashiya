@@ -238,7 +238,7 @@ textarea:focus{outline:none;}
     <div class="settings-head" onclick="this.nextElementSibling.classList.toggle('open')">🔗 連携設定（クリックで開閉）</div>
     <div class="settings-body">
       <div class="settings-row">
-        <input type="text" id="gasUrlInput" placeholder="https://script.google.com/macros/s/AKfycbwIso-Q30s0TcLQHeOM9hLs0m2kpufrCbXamqMseZCS-eLLTZxo0zT0ASv5qr82pd4xRA/exec">
+        <input type="text" id="gasUrlInput" placeholder="">
         <button onclick="saveGasUrl()">保存</button>
       </div>
       <div class="settings-status" id="gasUrlStatus">未設定：AI分析・スプレッドシート記録のどちらも動作しません。</div>
@@ -287,7 +287,7 @@ textarea:focus{outline:none;}
 // 公開後は、ここに発行したGoogle Apps Script Web AppのURL(.../exec)を直接貼り付けてください。
 // こうしておけば、サイトを訪れた人は誰も設定不要ですぐに使えます（下の設定欄への入力は、
 // このブラウザだけの一時的な動作確認用の上書きです）。
-const GAS_URL_DEFAULT = "";
+const GAS_URL_DEFAULT = "https://script.google.com/macros/s/AKfycbwIso-Q30s0TcLQHeOM9hLs0m2kpufrCbXamqMseZCS-eLLTZxo0zT0ASv5qr82pd4xRA/exec";
 let gasUrl = GAS_URL_DEFAULT;
  
 /* ===================== BASE CATEGORY DEFINITIONS ===================== */
